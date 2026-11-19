@@ -17,6 +17,7 @@ builder.Services.ConfigureHttpJsonOptions(options =>
     options.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 
 builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddProblemDetails();
 
 var connectionString = builder.Configuration.GetConnectionString("RoomHub") ?? "Data Source=roomhub.db";
 builder.Services.AddDbContext<RoomHubDbContext>(options => options.UseSqlite(connectionString));
@@ -32,6 +33,18 @@ builder.Services.AddScoped<IQueryHandler<GetBookingQuery, GetBookingResponse>, G
 builder.Services.AddScoped<ICommandHandler<CancelBookingCommand>, CancelBookingHandler>();
 
 var app = builder.Build();
+
+app.UseExceptionHandler();
+
+app.UseStatusCodePages(async statusCodeContext =>
+{
+    var http = statusCodeContext.HttpContext;
+    await Results.Problem(
+        statusCode: http.Response.StatusCode,
+        title: "Request failed",
+        detail: "The request could not be processed.")
+        .ExecuteAsync(http);
+});
 
 using (var scope = app.Services.CreateScope())
 {
